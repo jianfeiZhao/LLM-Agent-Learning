@@ -207,6 +207,8 @@ python prompt_manager.py
 - 响应Schema定义
 - 生成参数配置（温度、最大Token数等）
 
+**详细配置说明**: 请参考 [Prompt配置说明文档](PROMPT_CONFIG_GUIDE.md)
+
 ## 📊 性能监控
 
 系统提供实时性能监控，包括：
@@ -247,8 +249,50 @@ LLM-Agent-Learning/
 ├── prompt_config.json     # Prompt配置文件
 ├── swarm_coordinator.py   # Swarm协调器
 ├── main.py               # 主程序入口
+├── test_system.py        # 系统测试脚本
 ├── requirements.txt      # 依赖文件
+├── PROMPT_CONFIG_GUIDE.md # Prompt配置说明文档
 └── README.md            # 项目说明
+```
+
+## 🎯 系统完成状态
+
+### ✅ 已实现功能
+
+- **多Agent架构**: 完整的Master、Planner、Executor、Writer四个Agent
+- **LLM集成**: 所有Agent都基于大语言模型进行智能决策
+- **Prompt管理**: 支持动态修改Agent的Prompt模板
+- **任务分解**: 智能分析查询复杂度并分解任务
+- **DAG调度**: 有向无环图任务依赖管理
+- **鲁棒性**: 支持LLM失败时的降级处理
+- **Swarm协调**: 并发任务管理和负载均衡
+- **配置管理**: 灵活的环境配置和参数调整
+
+### 🔧 使用方法
+
+#### 快速开始
+```bash
+# 安装依赖
+pip install -r requirements.txt
+
+# 运行演示模式
+python main.py demo
+
+# 运行交互模式
+python main.py
+
+# 运行系统测试
+python test_system.py
+```
+
+#### Prompt管理
+```bash
+# 独立Prompt管理工具
+python prompt_manager.py
+
+# 在主程序中管理Prompt
+python main.py
+# 然后输入 'prompt' 进入管理界面
 ```
 
 ## 🔮 未来规划
@@ -259,6 +303,8 @@ LLM-Agent-Learning/
 - [ ] 支持多语言查询
 - [ ] 添加语音交互功能
 - [ ] 实现移动端适配
+- [ ] 支持更多LLM提供商
+- [ ] 添加Agent性能监控
 
 ## 📄 许可证
 

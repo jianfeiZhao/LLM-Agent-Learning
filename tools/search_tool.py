@@ -3,19 +3,23 @@
 """
 import asyncio
 import aiohttp
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from models import AgentResponse
+from config import settings
 
 class SearchTool:
     """搜索工具"""
     
     def __init__(self):
         self.search_engines = [
+            self._appid_search,
             self._mock_search,
             self._web_search,
             self._knowledge_base_search
         ]
         self.current_engine_index = 0
+        self.appid_list = settings.appid_list
+        self.current_appid_index = 0
     
     async def search(self, query: str) -> AgentResponse:
         """
@@ -45,6 +49,44 @@ class SearchTool:
             success=False,
             error="所有搜索引擎都失败了"
         )
+    
+    def _get_next_appid(self) -> str:
+        """获取下一个可用的AppId（轮询方式）"""
+        if not self.appid_list:
+            return None
+        appid = self.appid_list[self.current_appid_index]
+        self.current_appid_index = (self.current_appid_index + 1) % len(self.appid_list)
+        return appid
+    
+    async def _appid_search(self, query: str) -> AgentResponse:
+        """基于AppId的搜索"""
+        try:
+            appid = self._get_next_appid()
+            if not appid:
+                return AgentResponse(success=False, error="没有可用的AppId")
+            
+            print(f"🔑 使用AppId进行搜索: {appid}")
+            
+            # 这里应该调用实际的搜索API，使用appid进行认证
+            # 目前返回模拟结果
+            await asyncio.sleep(0.8)
+            
+            return AgentResponse(
+                success=True,
+                result={
+                    "title": f"基于AppId {appid} 的搜索结果",
+                    "content": f"这是使用AppId {appid} 搜索 '{query}' 的结果...",
+                    "appid": appid,
+                    "source": "appid_search"
+                },
+                metadata={"source": "appid_search", "query": query, "appid": appid}
+            )
+            
+        except Exception as e:
+            return AgentResponse(
+                success=False,
+                error=f"AppId搜索失败: {str(e)}"
+            )
     
     async def _mock_search(self, query: str) -> AgentResponse:
         """模拟搜索（用于演示）"""

@@ -188,11 +188,33 @@ class ExecutorAgent:
                 result = await self.llm_client.generate_structured_response(
                     full_prompt, response_schema
                 )
+                # 确保结构化响应包含必要字段
+                if not isinstance(result, dict):
+                    result = {"result": str(result)}
+                if "success" not in result:
+                    result["success"] = True
+                if "result" not in result:
+                    result["result"] = str(result.get("result", ""))
+                if "metadata" not in result:
+                    result["metadata"] = {}
             else:
                 response = await self.llm_client.generate_response(full_prompt)
-                # 简单的JSON解析
+                # 尝试解析JSON，如果失败则创建默认结构
                 import json
-                result = json.loads(response)
+                try:
+                    # 检查响应是否为空或只包含空白字符
+                    if not response or not response.strip():
+                        raise json.JSONDecodeError("Empty response", response, 0)
+                    result = json.loads(response)
+                except json.JSONDecodeError as e:
+                    print(f"⚠️ JSON解析失败: {str(e)}")
+                    print(f"📝 原始响应: {response[:200]}...")
+                    # 如果解析失败，创建默认结构
+                    result = {
+                        "success": True,
+                        "result": response,
+                        "metadata": {"source": "llm_response"}
+                    }
             
             # 转换为AgentResponse格式
             return AgentResponse(

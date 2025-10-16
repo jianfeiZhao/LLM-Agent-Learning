@@ -84,25 +84,102 @@ class MasterAgent:
             # 获取生成参数
             generation_params = self.prompt_manager.get_generation_params(AgentType.MASTER)
             
-            # 调用LLM
-            response = await self.llm_client.generate_response(
-                full_prompt,
-                **generation_params
-            )
+            # 获取响应Schema
+            response_schema = self.prompt_manager.get_response_schema(AgentType.MASTER)
             
-            # 解析响应
-            if "complex" in response.lower():
-                return QueryComplexity.COMPLEX
+            # 调用LLM生成结构化响应
+            if response_schema:
+                response = await self.llm_client.generate_structured_response(
+                    full_prompt,
+                    response_schema,
+                    **generation_params
+                )
+                
+                # 打印完整的LLM响应
+                print(f"🤖 Master Agent分析结果:")
+                print(f"   复杂度: {response.get('complexity', 'unknown')}")
+                print(f"   理由: {response.get('reason', '无')}")
+                print(f"   策略: {response.get('strategy', '无')}")
+                
+                # 判断复杂度
+                if response.get('complexity', '').lower() == 'complex':
+                    return QueryComplexity.COMPLEX
+                else:
+                    return QueryComplexity.SIMPLE
             else:
-                return QueryComplexity.SIMPLE
+                # 回退到非结构化响应
+                response = await self.llm_client.generate_response(
+                    full_prompt,
+                    **generation_params
+                )
+                
+                # 打印完整的LLM响应
+                print(f"🤖 Master Agent分析结果:")
+                print(f"   {response}")
+                
+                # 解析响应，提取复杂度判断理由
+                complexity_reason = self._extract_complexity_reason(response)
+                if complexity_reason:
+                    print(f"💭 复杂度判断理由: {complexity_reason}")
+                
+                # 判断复杂度
+                if "complex" in response.lower():
+                    return QueryComplexity.COMPLEX
+                else:
+                    return QueryComplexity.SIMPLE
                 
         except Exception as e:
             print(f"⚠️ LLM复杂度分析失败，使用默认策略: {str(e)}")
             # 降级到简单规则判断
             if len(query.query) > 50 or any(keyword in query.query for keyword in ["比较", "对比", "分析", "规划"]):
+                print(f"💭 降级判断理由: 查询长度({len(query.query)}字符)或包含复杂关键词")
                 return QueryComplexity.COMPLEX
             else:
+                print(f"💭 降级判断理由: 查询较短且无复杂关键词")
                 return QueryComplexity.SIMPLE
+    
+    def _extract_complexity_reason(self, response: str) -> str:
+        """
+        从LLM响应中提取复杂度判断理由
+        
+        Args:
+            response: LLM的完整响应
+            
+        Returns:
+            str: 提取的理由，如果无法提取则返回空字符串
+        """
+        try:
+            # 尝试提取理由部分
+            lines = response.split('\n')
+            reason_lines = []
+            
+            # 查找包含"理由"、"原因"、"因为"等关键词的行
+            for line in lines:
+                line = line.strip()
+                if any(keyword in line for keyword in ["理由", "原因", "因为", "reason", "because"]):
+                    # 清理行内容，移除关键词前缀
+                    cleaned_line = line
+                    for keyword in ["理由:", "原因:", "因为:", "reason:", "because:"]:
+                        if keyword in cleaned_line:
+                            cleaned_line = cleaned_line.split(keyword, 1)[1].strip()
+                            break
+                    if cleaned_line:
+                        reason_lines.append(cleaned_line)
+            
+            # 如果找到理由行，返回第一个
+            if reason_lines:
+                return reason_lines[0]
+            
+            # 如果没有找到明确的关键词，尝试提取第一行非空内容作为理由
+            for line in lines:
+                line = line.strip()
+                if line and not line.startswith(('{', '}', '"', "'")):
+                    return line
+            
+            return ""
+            
+        except Exception:
+            return ""
     
     async def _handle_simple_query(self, query: UserQuery) -> AgentResponse:
         """

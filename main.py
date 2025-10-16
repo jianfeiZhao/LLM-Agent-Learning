@@ -8,14 +8,14 @@ from typing import Optional
 
 from swarm_coordinator import SwarmCoordinator
 from models import AgentResponse
-from llm_client import get_llm_client, LLMClientFactory
+from llm_client import get_llm_client, set_llm_client, LLMClientFactory
 from config import settings
 
 class TravelAssistantApp:
     """旅游攻略小助手应用"""
     
     def __init__(self):
-        self.swarm = SwarmCoordinator(max_concurrent_tasks=5)
+        self.swarm = None
         self.is_running = False
     
     async def start(self):
@@ -26,17 +26,31 @@ class TravelAssistantApp:
         
         # 初始化LLM客户端
         try:
-            llm_client = LLMClientFactory.create_client(
-                provider=settings.llm_provider,
-                api_key=settings.openai_api_key,
-                model=settings.llm_model
-            )
-            print(f"✅ LLM客户端已初始化: {settings.llm_provider}")
+            # 根据配置选择客户端类型
+            if settings.openai_api_key:
+                provider = "openai"
+                kwargs = {"api_key": settings.openai_api_key, "model": settings.llm_model, "base_url": settings.openai_base_url}
+            elif settings.appid_list:
+                provider = "appid"
+                kwargs = {"appid_list": settings.appid_list, "model": settings.llm_model, "base_url": settings.openai_base_url}
+            else:
+                provider = "mock"
+                kwargs = {}
+            
+            llm_client = LLMClientFactory.create_client(provider=provider, **kwargs)
+            set_llm_client(llm_client)
+            print(f"✅ LLM客户端已初始化: {provider}")
+            if provider == "appid":
+                print(f"📋 配置了 {len(settings.appid_list)} 个AppId")
         except Exception as e:
             print(f"⚠️ LLM客户端初始化失败: {str(e)}")
             print("将使用模拟客户端")
+            # 失败时回退为mock客户端
+            llm_client = LLMClientFactory.create_client(provider="mock")
+            set_llm_client(llm_client)
         
-        # 启动Swarm协调器
+        # 启动Swarm协调器（在设置全局LLM客户端之后再创建）
+        self.swarm = SwarmCoordinator(max_concurrent_tasks=5)
         await self.swarm.start()
         self.is_running = True
         

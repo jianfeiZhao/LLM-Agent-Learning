@@ -5,10 +5,10 @@ Planner Agent - 规划器
 """
 import uuid
 import re
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Set, Tuple, Any
 from datetime import datetime
 
-from models import UserQuery, Task, TaskType, DAG, DAGNode
+from models import UserQuery, Task, TaskType, TaskStatus, DAG, DAGNode
 from llm_client import get_llm_client
 from prompt_templates import get_prompt_manager, AgentType
 
@@ -78,11 +78,36 @@ class PlannerAgent:
                 result = await self.llm_client.generate_structured_response(
                     full_prompt, response_schema
                 )
+                # 确保结构化响应包含必要字段
+                if not isinstance(result, dict):
+                    result = {"tasks": [], "dependencies": {}}
+                if "tasks" not in result:
+                    result["tasks"] = []
+                if "dependencies" not in result:
+                    result["dependencies"] = {}
             else:
                 response = await self.llm_client.generate_response(full_prompt)
-                # 简单的JSON解析
+                # 尝试解析JSON，如果失败则创建默认结构
                 import json
-                result = json.loads(response)
+                try:
+                    # 检查响应是否为空或只包含空白字符
+                    if not response or not response.strip():
+                        raise json.JSONDecodeError("Empty response", response, 0)
+                    result = json.loads(response)
+                except json.JSONDecodeError as e:
+                    print(f"⚠️ JSON解析失败: {str(e)}")
+                    print(f"📝 原始响应: {response[:200]}...")
+                    # 如果解析失败，创建默认规划结构
+                    result = {
+                        "tasks": [
+                            {
+                                "id": "task1",
+                                "type": "search",
+                                "description": f"搜索相关信息: {query}"
+                            }
+                        ],
+                        "dependencies": {}
+                    }
             
             return result
             
